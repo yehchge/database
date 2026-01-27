@@ -108,6 +108,14 @@ class Database {
     }
 
     /**
+     * 關閉資料庫
+     * @return void
+     */
+    public function vClose() {
+        $this->m_iDbh = null;
+    }
+
+    /**
      * query db
      * @param  string $sSql   SQL語法
      * @param  array  $aBinds 綁定的資料
