@@ -1,0 +1,24 @@
+{
+    "name": "yehchge/database",
+    "description": "MySQL Database C.R.U.D",
+    "type": "library",
+    "license":"MIT",
+    "minimum-stability": "stable",
+    "require-dev": {
+        "phpunit/phpunit": "^12.5"
+    },
+    "require": {
+        "php":">=5.3.0"
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit"
+    },
+    "archive": {
+        "exclude": ["*.sh", "tests/", "README.md", ".gitignore", "*.zip", "*.xml"]
+    },
+    "autoload": {
+        "psr-4": {
+           "yehchge\\database\\": "src/"
+       }
+    }
+}
