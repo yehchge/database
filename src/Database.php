@@ -20,6 +20,8 @@ class Database {
     private $m_iRs   = 0;
     private $m_character = "utf8";
 
+    private $iTransactionLayer = 0; //used to control nested transaction(for nested classes' functions)
+
     /**
      * 連線資料庫
      * @param string $sDb   Database name
@@ -49,6 +51,11 @@ class Database {
     public function __destruct()
     {
         $this->m_iDbh = null;
+
+        if($this->iTransactionLayer !== 0){
+            $sLogicErrorMsg = "vBegin & vCommit's quantity do not match on database: {$this->m_sDb}!";
+            die($sLogicErrorMsg);
+        }
     }
 
     public static function oDB($sDBName){
@@ -119,16 +126,13 @@ class Database {
      * query db
      * @param  string $sSql   SQL語法
      * @param  array  $aBinds 綁定的資料
+     * @return \PDOStatement returns value of variable $m_iRs
      */
     public function iQuery($sSql, $aBinds=array()) {
         $i = 0;
 
         try {
             $this->m_iRs = $this->m_iDbh->prepare($sSql); // Returns a PDOStatement object
-
-            // for($i=0;$i<count($aBinds);$i++){
-            //     $this->m_iRs->bindParam($i+1, $aBinds[$i], \PDO::PARAM_STR | \PDO::PARAM_INT);
-            // }
 
             foreach ($aBinds as $key => $value) {
                 $this->m_iRs->bindValue($key + 1, $value, is_int($value) ? \PDO::PARAM_INT :  \PDO::PARAM_STR);
@@ -143,33 +147,37 @@ class Database {
     }
 
     /**
-    * 取得sql結果比數
+    * 取得 sql 結果比數
     * @param $iRs resource result
-    * @return Get number of rows in result
+    * @return int Get number of rows in result
     */
     public function iNumRows($iRs=0) {
-        if($iRs) $iTmpRs=$iRs;
-        else    $iTmpRs=$this->m_iRs;
+        if($iRs) $iTmpRs = $iRs;
+        else     $iTmpRs = $this->m_iRs;
         if(!$iTmpRs) return 0;
         return $iTmpRs->rowCount();
     }
 
     /**
-    * 取得sql結果
+    * 取得 sql 結果
     * @param $iRs resource result
-    * @return Fetch a result row as an associative array, a numeric array, or both.
+    * @return array Fetch a result row as an associative array, a numeric array, or both.
     */
     public function aFetchAssoc($iRs=0) {
-        if(!$this->m_iRs && !$iRs) return 0;
+        if(!$this->m_iRs && !$iRs) return [];
 
-        if($iRs) $iTmpRs=$iRs;
-        else    $iTmpRs=$this->m_iRs;
-        return  $iTmpRs->fetch(\PDO::FETCH_ASSOC);
+        if($iRs) $iTmpRs = $iRs;
+        else     $iTmpRs = $this->m_iRs;
+        return   $iTmpRs->fetch(\PDO::FETCH_ASSOC);
+    }
+
+    public function aFetchArray($iRs=0) {
+        return $this->aFetchAssoc($iRs);
     }
 
     /**
-    * 取得insert後的自動流水號
-    * @return Get the ID generated from the previous INSERT operation
+    * 取得 insert 後的自動流水號
+    * @return int Get the ID generated from the previous INSERT operation
     */
     public function iGetInsertId() {
         if(!$this->m_iRs) return 0;
@@ -202,6 +210,33 @@ class Database {
             throw new \PDOException($e->getMessage());
         }
     }
+
+    /**
+    * insert into table
+    * @param $sTable db table $aField field array $aValue value array
+    * @return string if return sql is ok  "" is failure
+    */
+    public function sInsert($sTable,$aBinds) {
+        if(!is_array($aBinds)) return '';
+
+        $sSql="INSERT INTO $sTable ";
+        $aField = array_keys($aBinds);
+        $sSql.='('.implode(",",$aField).')';
+        $sSql.='VALUES(:'.implode(", :", $aField).')';
+        $this->m_iRs = $this->m_iDbh->prepare($sSql);
+        foreach($aBinds as $bindKey => $value){
+            $this->m_iRs->bindValue(":$bindKey", $value);
+        }
+
+        try{
+            $this->m_iRs->execute();
+            $this->m_iRs->closeCursor();
+            return $sSql;
+        }catch(\PDOException $ex){
+            throw new \Exception($ex->getMessage());
+        }
+    }
+
 
     /**
     * update table
@@ -245,6 +280,38 @@ class Database {
         }
     }
 
+    /**
+    * update  table
+    * @param $sTable db table $aField field array $aValue value array $sWhere trem
+    * @return string if return sql is ok  "" is failure
+    */
+    public function sUpdate($sTable,$aBinds,$sWhere) {
+        if(!is_array($aBinds)) return '';
+        $aField = array_keys($aBinds);
+
+        $sSql="UPDATE $sTable SET ";
+        for($i=0;$i<count($aField);$i++) {
+            $sSql.="`".$aField[$i]."`=:".$aField[$i];
+            if(($i+1)!=count($aField)) $sSql.=",";
+        }
+        if($sWhere)
+            $sSql.=" WHERE ".$sWhere;
+
+        try{
+            $this->m_iRs = $this->m_iDbh->prepare($sSql);
+
+            foreach($aBinds as $bindKey => $value){
+                $this->m_iRs->bindValue(":$bindKey", $value, PDO::PARAM_STR| PDO::PARAM_INT);
+            }
+
+            $this->m_iRs->execute();
+            $this->m_iRs->closeCursor();
+            return $sSql;
+        }catch(\PDOException $ex){
+            throw new \PDOException($ex->getMessage());
+        }
+    }
+
     private function my_quotes($data) {
         if(is_null($data)) return null;
         if(is_array($data)) {
@@ -272,5 +339,93 @@ class Database {
             $str = preg_replace('/[\x{00AD}\x{180E}\x{200B}\x{200C}\x{200D}\x{2060}\x{FEFF}]/isu', '', $str);
         }
         return $str;
+    }
+
+    /*
+        delete data from target table
+    */
+    public function vDelete($sTable,$sWhere, $aBinds=array()){
+        try{
+            $this->iQuery("DELETE FROM $sTable WHERE $sWhere",$aBinds);
+            if(!$this->m_iRs)
+                throw new \Exception("CDbShell->vDelete: fail to delete data in $sTable");
+        }catch (\PDOException $e){
+            throw new \PDOException($e->getMessage());
+        }
+
+        $this->m_iRs->closeCursor();
+    }
+
+    /**
+    * 得到table create sql info
+    * @param $sTable db table
+    * @return array
+    */
+    public function aGetCreateTableInfo($sTable){
+        $this->iQuery("SET SQL_QUOTE_SHOW_CREATE = 1");
+        $this->iQuery("SHOW CREATE TABLE $sTable");
+        $aRow=$this->aFetchArray();
+        return $aRow;
+    }
+
+    /**
+    * 得到table create sql info
+    * @param $sTable db table
+    * @return boolean
+    */
+    public function bIsTableExist($sTable){
+        $iDbq = $this->iQuery("SHOW TABLES LIKE '%$sTable%'");
+        if($this->iNumRows($iDbq))
+            return true;
+        return false;
+    }
+
+    // transactions function
+    public function vBegin() {
+        //if this CDbShell already start a trancation, it won't "begin" again , but only +1 on layer
+        if($this->iTransactionLayer===0)
+            $this->iQuery("begin");
+        $this->iTransactionLayer++;
+    }
+
+    public function vCommit() {
+        //if this CDbShell's trancation layer is more than 1, it won't "commit" right away
+        //, but only -1 on layer, there will be another vCommit later
+        $this->iTransactionLayer--;
+        if($this->iTransactionLayer===0)
+            $this->iQuery("commit");
+    }
+
+    public function vRollback() {
+        $this->iTransactionLayer = 0;
+        $this->iQuery("rollback");
+    }
+
+    /**
+    * 得到某筆資料是在第幾頁
+    * @param $sTable db table $iGoId 流水號 $iPageItems 每頁顯示比數 $sSearchSql 條件 $sPostFix 順序&limit
+    * @return int 數字
+    */
+    public function iGetItemAtPage($sTable="", $sField="", $iGoId=0, $iPageItems=0, $sSearchSql='', $aBinds=array(), $sPostFix=''){
+        if(!$sTable || !$sField) return 0;
+        $sSql = "SELECT $sField  FROM $sTable";
+        if($sSearchSql!=='')
+            $sSql .= " WHERE $sSearchSql";
+        if($sPostFix!=='')
+            $sSql .= " $sPostFix";
+
+        $this->iQuery($sSql,$aBinds);
+        $i=0;
+        $biFind = false;
+        while($aRow=$this->aFetchArray()) {
+            if($aRow[$sField]==$iGoId) {
+                $biFind = true;
+                break;
+            }
+            $i++;
+        }
+        if(!$biFind) $i=0;
+
+        return (INT)($i/$iPageItems);
     }
 }

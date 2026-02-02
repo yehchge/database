@@ -29,6 +29,7 @@ $db = new Database();
 ## Test
 
 ```bash
+cp phpunit.example.xml phpunit.xml
 sudo apt install php-sqlite3
 composer test
 ```
