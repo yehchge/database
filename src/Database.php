@@ -19,6 +19,7 @@ class Database {
     private $m_iDbh  = 0;
     private $m_iRs   = 0;
     private $m_character = "utf8";
+    private $dsn     = '';
 
     private $iTransactionLayer = 0; //used to control nested transaction(for nested classes' functions)
 
@@ -89,9 +90,9 @@ class Database {
     public function vConnect() {
         // 判斷是否為 SQLite 記憶體模式
         if ($this->m_sHost === ':memory:' || $this->m_sDb === ':memory:') {
-            $dsn = "sqlite::memory:";
+            $this->dsn = "sqlite::memory:";
         } else {
-            $dsn = "mysql:host={$this->m_sHost};port={$this->m_sPort};dbname={$this->m_sDb};charset={$this->m_character}";
+            $this->dsn = "mysql:host={$this->m_sHost};port={$this->m_sPort};dbname={$this->m_sDb};charset={$this->m_character}";
         }
 
         $options = [
@@ -104,10 +105,10 @@ class Database {
         $pass = $this->m_sPass;
 
         try {
-            if (strpos($dsn, 'sqlite:') === 0) {
-                $this->m_iDbh = new \PDO($dsn, null, null, $options);
+            if (strpos($this->dsn, 'sqlite:') === 0) {
+                $this->m_iDbh = new \PDO($this->dsn, null, null, $options);
             } else {
-                $this->m_iDbh = new \PDO($dsn, $user, $pass, $options);
+                $this->m_iDbh = new \PDO($this->dsn, $user, $pass, $options);
             }
         } catch (\PDOException $e) {
             throw new \RuntimeException('Database connection failed: ' . $e->getMessage());
@@ -135,7 +136,7 @@ class Database {
             $this->m_iRs = $this->m_iDbh->prepare($sSql); // Returns a PDOStatement object
 
             foreach ($aBinds as $key => $value) {
-                $this->m_iRs->bindValue($key + 1, $value, is_int($value) ? \PDO::PARAM_INT :  \PDO::PARAM_STR);
+                $this->m_iRs->bindValue($key + 1, $value, is_int($value) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
             }
 
             $this->m_iRs->execute();
@@ -155,7 +156,10 @@ class Database {
         if($iRs) $iTmpRs = $iRs;
         else     $iTmpRs = $this->m_iRs;
         if(!$iTmpRs) return 0;
-        return $iTmpRs->rowCount();
+        // return $iTmpRs->rowCount(); // for MySQL
+        $results = $iTmpRs->fetchAll(\PDO::FETCH_ASSOC);
+        $count = count($results);
+        return $count;
     }
 
     /**
@@ -301,10 +305,11 @@ class Database {
             $this->m_iRs = $this->m_iDbh->prepare($sSql);
 
             foreach($aBinds as $bindKey => $value){
-                $this->m_iRs->bindValue(":$bindKey", $value, PDO::PARAM_STR| PDO::PARAM_INT);
+                $this->m_iRs->bindValue(":$bindKey", $value, \PDO::PARAM_STR| \PDO::PARAM_INT);
             }
 
             $this->m_iRs->execute();
+            // $iAffectedRows = $this->m_iRs->rowCount();
             $this->m_iRs->closeCursor();
             return $sSql;
         }catch(\PDOException $ex){
@@ -344,7 +349,7 @@ class Database {
     /*
         delete data from target table
     */
-    public function vDelete($sTable,$sWhere, $aBinds=array()){
+    public function vDelete($sTable, $sWhere, $aBinds=array()){
         try{
             $this->iQuery("DELETE FROM $sTable WHERE $sWhere",$aBinds);
             if(!$this->m_iRs)
@@ -374,7 +379,13 @@ class Database {
     * @return boolean
     */
     public function bIsTableExist($sTable){
-        $iDbq = $this->iQuery("SHOW TABLES LIKE '%$sTable%'");
+        if (strpos($this->dsn, 'sqlite:') === 0) {
+            $sql = "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%$sTable%'";
+        } else {
+            $sql = "SHOW TABLES LIKE '%$sTable%'";
+        }
+
+        $iDbq = $this->iQuery($sql);
         if($this->iNumRows($iDbq))
             return true;
         return false;
@@ -408,7 +419,7 @@ class Database {
     */
     public function iGetItemAtPage($sTable="", $sField="", $iGoId=0, $iPageItems=0, $sSearchSql='', $aBinds=array(), $sPostFix=''){
         if(!$sTable || !$sField) return 0;
-        $sSql = "SELECT $sField  FROM $sTable";
+        $sSql = "SELECT $sField FROM $sTable";
         if($sSearchSql!=='')
             $sSql .= " WHERE $sSearchSql";
         if($sPostFix!=='')

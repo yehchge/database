@@ -31,8 +31,8 @@ class DatabaseIntegrationTest extends TestCase {
         $mysql->iQuery("TRUNCATE TABLE test_table");
 
         return [
-            'SQLite 環境' => [$sqlite],
-            'MySQL 環境'  => [$mysql],
+            'SQLite 環境' => [$sqlite, 'sqlite'],
+            'MySQL 環境'  => [$mysql, 'mysql'],
         ];
     }
 
@@ -40,7 +40,7 @@ class DatabaseIntegrationTest extends TestCase {
      * @dataProvider databaseProvider
      */
     #[DataProvider('databaseProvider')]
-    public function testCompleteCRUD(Database $db) {
+    public function testCompleteCRUD(Database $db, string $envType) {
         // 1. Insert
         $insertData = ['name' => 'TestUser', 'status' => 1];
         $id = $db->bInsert('test_table', $insertData);
@@ -57,10 +57,81 @@ class DatabaseIntegrationTest extends TestCase {
         $affectedRows = $db->bUpdate('test_table', ['id' => $id], $updateData);
         $this->assertEquals(1, $affectedRows);
 
+        // 4. Update 測試 WHERE 條件
+        $insertData = ['name' => 'Test2User', 'status' => 1];
+        $where_id = $db->bInsert('test_table', $insertData);
+
+        $updateData = ['name' => 'WhereUpdatedUser'];
+        $affectedRows = $db->bUpdate('test_table', ['id' => $where_id], $updateData);
+        $this->assertEquals(1, $affectedRows);
+
         // 4. Verify Update
         $res = $db->iQuery("SELECT name FROM test_table WHERE id = ?", [$id]);
         $row = $db->aFetchAssoc($res);
         $this->assertEquals('UpdatedUser', $row['name']);
+
+        // 5. 筆數
+        $res = $db->iQuery("SELECT * FROM test_table");
+        $rowCount = $db->iNumRows($res);
+        $this->assertEquals(2, $rowCount);
+
+        // 6. create table
+        if ($envType == 'mysql') {
+            $aTableInfo = $db->aGetCreateTableInfo('test_table');
+            if(!empty($aTableInfo['Create Table'])){
+                $aTableInfo['Create Table'] = preg_replace("/test_table/i", "test_table_2025", $aTableInfo['Create Table']);
+            }
+            $db->iQuery($aTableInfo['Create Table'].";\n\n");
+            $insertData = ['name' => 'TestUser', 'status' => 1];
+            $id = $db->bInsert('test_table_2025', $insertData);
+            $this->assertGreaterThan(0, $id);
+            $db->iQuery('DROP TABLE `test_table_2025`');
+        }
+
+        // 7. sInsert
+        $insertData = ['name' => 'TestUser', 'status' => 1];
+        $db->sInsert('test_table', $insertData);
+        $id = $db->iGetInsertId();
+        $this->assertEquals(3, $id);
+
+        // 8. sUpdate($sTable,$aBinds,$sWhere) (注意：MySQL 成功後 rowCount 為 1，沒變動為 0)
+        $updateData = ['name' => 'UpdatedUser2'];
+        $affectedRows = $db->sUpdate('test_table', $updateData, "id = $id");
+        $res = $db->iQuery("SELECT name FROM test_table WHERE id = ?", [$id]);
+        $row = $db->aFetchAssoc($res);
+        $this->assertEquals('UpdatedUser2', $row['name']);
+
+        // 9. vDelete
+        $db->vDelete('test_table', 'id=?', [$id]);
+        $res = $db->iQuery("SELECT count(*) as total FROM test_table");
+        $row = $db->aFetchAssoc($res);
+        $this->assertEquals(2, $row['total']);
+
+        // 10. bIsTableExist
+        $this->assertTrue($db->bIsTableExist('test_table'));
+        $this->assertFalse($db->bIsTableExist('fake_table'));
+
+        // 11. transactions, commit
+        $db->vBegin();
+        $insertData = ['name' => 'CommitTestUser', 'status' => 1];
+        $db->bInsert('test_table', $insertData);
+        $db->vCommit();
+        $res = $db->iQuery("SELECT count(*) as total FROM test_table");
+        $row = $db->aFetchAssoc($res);
+        $this->assertEquals(3, $row['total']);
+
+        // 12. transactions, rollback
+        $db->vBegin();
+        $insertData = ['name' => 'RollbackTestUser', 'status' => 1];
+        $db->bInsert('test_table', $insertData);
+        $db->vRollback();
+        $res = $db->iQuery("SELECT count(*) as total FROM test_table");
+        $row = $db->aFetchAssoc($res);
+        $this->assertEquals(3, $row['total']);
+
+        // 13. iGetItemAtPage
+        $this->assertEquals(0, $db->iGetItemAtPage('test_table', 'id', 1, 10));
+        $this->assertEquals(1, $db->iGetItemAtPage('test_table', 'id', 1, 2, '', [], 'ORDER BY id DESC'));
     }
 
     
