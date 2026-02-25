@@ -88,15 +88,47 @@ class DatabaseIntegrationTest extends TestCase {
             $db->iQuery('DROP TABLE `test_table_2025`');
         }
 
-        // 7. sInsert
+        // 7. sInsert (deprecated method should emit a user‑deprecated warning)
         $insertData = ['name' => 'TestUser', 'status' => 1];
+
+        // Capture E_USER_DEPRECATED manually (older PHPUnit versions may lack expectDeprecation)
+        $deprecationCaught = false;
+        set_error_handler(function($errno, $errstr) use (&$deprecationCaught) {
+            if ($errno === E_USER_DEPRECATED && strpos($errstr, 'is deprecated') !== false) {
+                $deprecationCaught = true;
+                return true; // prevent PHP internal handler from running
+            }
+            return false;
+        });
+
         $db->sInsert('test_table', $insertData);
+
+        // restore the original error handler and assert
+        restore_error_handler();
+        $this->assertTrue($deprecationCaught, 'sInsert should trigger user deprecation warning');
+
         $id = $db->iGetInsertId();
         $this->assertEquals(3, $id);
 
         // 8. sUpdate($sTable,$aBinds,$sWhere) (注意：MySQL 成功後 rowCount 為 1，沒變動為 0)
         $updateData = ['name' => 'UpdatedUser2'];
+
+        // Capture E_USER_DEPRECATED manually (older PHPUnit versions may lack expectDeprecation)
+        $deprecationCaught = false;
+        set_error_handler(function($errno, $errstr) use (&$deprecationCaught) {
+            if ($errno === E_USER_DEPRECATED && strpos($errstr, 'is deprecated') !== false) {
+                $deprecationCaught = true;
+                return true; // prevent PHP internal handler from running
+            }
+            return false;
+        });
+
         $affectedRows = $db->sUpdate('test_table', $updateData, "id = $id");
+
+        // restore the original error handler and assert
+        restore_error_handler();
+        $this->assertTrue($deprecationCaught, 'sUpdate should trigger user deprecation warning');
+
         $res = $db->iQuery("SELECT name FROM test_table WHERE id = ?", [$id]);
         $row = $db->aFetchAssoc($res);
         $this->assertEquals('UpdatedUser2', $row['name']);

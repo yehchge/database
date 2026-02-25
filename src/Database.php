@@ -189,10 +189,12 @@ class Database {
     }
 
     /**
-    * insert into table
-    * @param string $sTable The table name, array $aBinds The add data array
-    * @return boolean
-    */
+     * insert into table
+     *
+     * @param string $sTable The table name
+     * @param array  $aBinds The add data array
+     * @return int The ID generated from the previous INSERT operation
+     */
     public function bInsert($sTable, $aBinds) {
         if(!is_array($aBinds)) return 0;
 
@@ -216,15 +218,25 @@ class Database {
     }
 
     /**
-    * insert into table
-    * @param $sTable db table $aField field array $aValue value array
-    * @return string if return sql is ok  "" is failure
-    */
-    public function sInsert($sTable,$aBinds) {
+     * insert into table
+     *
+     * @deprecated 於版本 2.0 棄用，請改用 bInsert()
+     *             此方法會回傳 SQL 字串，之後會移除。
+     * @param string $sTable db table
+     * @param array  $aBinds 欄位 => 值
+     * @return string 執行的 SQL；失敗回傳空字串
+     */
+    public function sInsert($sTable, $aBinds) {
+        // 可選：在執行時觸發使用警告，幫助開發期發現
+        trigger_error(
+            __METHOD__ . ' is deprecated, use ' . __CLASS__ . '::bInsert() instead',
+            E_USER_DEPRECATED
+        );
+
         if(!is_array($aBinds)) return '';
 
         $sSql="INSERT INTO $sTable ";
-        $aField = array_keys($aBinds);
+        $aField = array_keys($aBinds); 
         $sSql.='('.implode(",",$aField).')';
         $sSql.='VALUES(:'.implode(", :", $aField).')';
         $this->m_iRs = $this->m_iDbh->prepare($sSql);
@@ -241,12 +253,14 @@ class Database {
         }
     }
 
-
     /**
-    * update table
-    * @param string $sTable The table name, array $aSrc The source data array, array $aTar The target data array
-    * @return boolean
-    */
+     * update table
+     *
+     * @param string $sTable The table name
+     * @param array  $aWhere The where data array
+     * @param array  $aBinds The update data array
+     * @return int The number of affected rows
+     */
     public function bUpdate($sTable, $aWhere, $aBinds) {
         if(!is_array($aBinds)) return 0;
         $aField = array_keys($aBinds);
@@ -285,11 +299,22 @@ class Database {
     }
 
     /**
-    * update  table
-    * @param $sTable db table $aField field array $aValue value array $sWhere trem
-    * @return string if return sql is ok  "" is failure
-    */
+     * update table
+     *
+     * @deprecated 於版本 2.0 棄用，請改用 bUpdate()
+     *             此方法會回傳 SQL 字串，之後會移除。
+     * @param string $sTable The table name
+     * @param array  $aBinds The update data array
+     * @param string $sWhere The where condition
+     * @return string The SQL string if successful, empty string on failure
+     */
     public function sUpdate($sTable,$aBinds,$sWhere) {
+        // 可選：在執行時觸發使用警告，幫助開發期發現
+        trigger_error(
+            __METHOD__ . ' is deprecated, use ' . __CLASS__ . '::bUpdate() instead',
+            E_USER_DEPRECATED
+        );
+
         if(!is_array($aBinds)) return '';
         $aField = array_keys($aBinds);
 
