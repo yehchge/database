@@ -257,39 +257,50 @@ class Database {
      * update table
      *
      * @param string $sTable The table name
-     * @param array  $aWhere The where data array
+     * @param array  $aWhere The where data array (will be used with prepared statements for safety)
      * @param array  $aBinds The update data array
      * @return int The number of affected rows
      */
     public function bUpdate($sTable, $aWhere, $aBinds) {
         if(!is_array($aBinds)) return 0;
+        
         $aField = array_keys($aBinds);
-
-        $sSql="UPDATE $sTable SET ";
-        for($i=0;$i<count($aField);$i++) {
-            $sSql.="`".$aField[$i]."`=:".$aField[$i];
-            if(($i+1)!=count($aField)) $sSql.=",";
+        $aWhereField = $aWhere ? array_keys($aWhere) : [];
+        
+        // Build SET clause with named parameters
+        $setClause = [];
+        foreach($aField as $field) {
+            $setClause[] = "`" . $field . "` = :" . $field;
         }
-
-        if($aWhere){
-            $aTmpWhere = array();
-            foreach( $aWhere AS $key => $value ) {
-                $aTmpWhere[] = "$key = '".$this->my_quotes($value)."'";
+        
+        $sSql = "UPDATE `" . $sTable . "` SET " . implode(", ", $setClause);
+        
+        // Build WHERE clause with named parameters (safe from SQL injection)
+        if($aWhere && is_array($aWhere) && count($aWhere) > 0) {
+            $whereClause = [];
+            foreach($aWhereField as $key) {
+                $whereClause[] = "`" . $key . "` = :where_" . $key;
             }
-
-            $sSql.=" WHERE ".implode( " AND " , $aTmpWhere );
+            $sSql .= " WHERE " . implode(" AND ", $whereClause);
         }
 
         try{
             $this->m_iRs = $this->m_iDbh->prepare($sSql);
+            
+            // Bind SET values
             foreach($aBinds as $bindKey => $value){
-                $this->m_iRs->bindValue(":$bindKey", $value, \PDO::PARAM_STR | \PDO::PARAM_INT);
+                $this->m_iRs->bindValue(":" . $bindKey, $value, is_int($value) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+            }
+            
+            // Bind WHERE values with distinct parameter names to avoid conflicts
+            if($aWhere && is_array($aWhere)) {
+                foreach($aWhere as $key => $value) {
+                    $this->m_iRs->bindValue(":where_" . $key, $value, is_int($value) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+                }
             }
 
             $this->m_iRs->execute();
-
             $iAffectedRows = $this->m_iRs->rowCount();
-            
             $this->m_iRs->closeCursor();
 
             return $iAffectedRows;
@@ -342,20 +353,6 @@ class Database {
         }
     }
 
-    private function my_quotes($data) {
-        if(is_null($data)) return null;
-        if(is_array($data)) {
-            foreach($data as $key => $val) {
-                $data[$key] = is_array($val) ? $this->my_quotes($val) : addslashes(trim((string)$val));
-                $data[$key] = self::removeNbsp($data[$key]);
-            }
-        } else {
-            $data = addslashes(trim((string)$data));
-            $data = self::removeNbsp($data);
-        }
-        return $data;
-    }
-
     /**
      * 刪除零寬字元
      * Replace non-breaking spaces with normal spaces
@@ -371,19 +368,145 @@ class Database {
         return $str;
     }
 
-    /*
-        delete data from target table
-    */
+    /**
+     * delete data from target table with SQL injection protection
+     *
+     * @param string $sTable The table name
+     * @param string $sWhere The WHERE clause with placeholders (e.g., "id = ? AND status = ?")
+     * @param array  $aBinds The values to bind (indexed array matching ? placeholders in order)
+     * @return void
+     * 
+     * SECURITY NOTICE:
+     * This method is safe from SQL injection ONLY if:
+     * 1. $sWhere contains ONLY the WHERE condition template with ? placeholders
+     * 2. ALL user input and dynamic values are passed through $aBinds
+     * 3. Do NOT concatenate values directly into $sWhere
+     * 4. $aBinds should be an indexed array with values in the same order as ? placeholders
+     *
+     * ✅ SAFE examples:
+     * $db->vDelete('users', 'id = ?', [123]);
+     * $db->vDelete('users', 'id = ? AND status = ?', [123, 'inactive']);
+     * $db->vDelete('users', 'email LIKE ?', ['%@example.com']);
+     * $db->vDelete('users', 'age > ? AND (status = ? OR role = ?)', [18, 'inactive', 'guest']);
+     * 
+     * ❌ UNSAFE examples (DO NOT USE):
+     * $db->vDelete('users', 'id = ' . $userId);  // ❌ Direct concatenation
+     * $db->vDelete('users', "status = '{$status}'");  // ❌ String interpolation
+     * $db->vDelete('users', "id IN (" . implode(',', $ids) . ")");  // ❌ Array concatenation
+     * $db->vDelete('users', "email = '{$email}' OR id = 1");  // ❌ Always dangerous
+     */
     public function vDelete($sTable, $sWhere, $aBinds=array()){
+        // Validate inputs
+        if(empty($sTable) || !is_string($sTable)) {
+            throw new \InvalidArgumentException("sTable must be a non-empty string");
+        }
+        if(empty($sWhere) || !is_string($sWhere)) {
+            throw new \InvalidArgumentException("sWhere must be a non-empty string");
+        }
+        if(!is_array($aBinds)) {
+            throw new \InvalidArgumentException("aBinds must be an array");
+        }
+        
+        // Security warning: Check for suspicious patterns that might indicate direct concatenation
+        // This is NOT a complete protection, but helps catch common mistakes
+        $suspiciousPatterns = [
+            '/\bunion\b/i',           // UNION keyword (often used in injection attacks)
+            '/;\s*(drop|delete|insert|update|create|alter)\b/i',  // Stacked queries
+            "/'\s*(or|and)\s*'/i",    // Quote patterns like ' OR '
+            "/\b(or|and)\s+1\s*=\s*1/i",  // OR 1=1 pattern
+            "/['\"]\s*\)/i",  // Closing quote and paren (query termination attempt)
+        ];
+        
+        foreach($suspiciousPatterns as $pattern) {
+            if(preg_match($pattern, $sWhere)) {
+                // Log warning but still allow execution (for backwards compatibility)
+                // In production, this could trigger an alert or block the query
+                trigger_error(
+                    "vDelete: Suspicious SQL pattern detected in WHERE clause. " .
+                    "Ensure all dynamic values are passed through aBinds, not concatenated into sWhere. " .
+                    "Query: DELETE FROM {$sTable} WHERE {$sWhere}",
+                    E_USER_WARNING
+                );
+            }
+        }
+        
+        $sSql = "DELETE FROM `" . $sTable . "` WHERE " . $sWhere;
+        
         try{
-            $this->iQuery("DELETE FROM $sTable WHERE $sWhere",$aBinds);
-            if(!$this->m_iRs)
+            $this->iQuery($sSql, $aBinds);
+            if(!$this->m_iRs) {
                 throw new \Exception("CDbShell->vDelete: fail to delete data in $sTable");
-        }catch (\PDOException $e){
+            }
+            $this->m_iRs->closeCursor();
+        } catch (\PDOException $e) {
             throw new \PDOException($e->getMessage());
         }
+    }
 
-        $this->m_iRs->closeCursor();
+    /**
+     * delete data from target table with complex WHERE conditions
+     *
+     * Use this method when you need complex WHERE logic (OR, comparison operators, LIKE, BETWEEN, etc.)
+     * All dynamic values MUST be passed through $aBinds to prevent SQL injection
+     *
+     * @param string $sTable The table name
+     * @param string $sWhereClause The WHERE clause with ? placeholders (e.g., "age > ? AND (status = ? OR role = ?)")
+     * @param array  $aBinds The values to bind (indexed array matching ? placeholders in order)
+     * @return void
+     *
+     * ✅ SAFE examples:
+     * $db->vDeleteComplex('users', 'age > ? AND (status = ? OR role = ?)', [18, 'inactive', 'guest']);
+     * $db->vDeleteComplex('users', 'email LIKE ?', ['%@example.com']);
+     * $db->vDeleteComplex('users', 'created_at BETWEEN ? AND ?', ['2025-01-01', '2025-12-31']);
+     * $db->vDeleteComplex('users', 'name IN (?, ?, ?)', ['admin', 'moderator', 'user']);
+     *
+     * ❌ UNSAFE examples (DO NOT USE):
+     * $db->vDeleteComplex('users', 'id IN (' . implode(',', $ids) . ')', []);  // Array concatenation
+     * $db->vDeleteComplex('users', "status = '{$status}'", []);  // String interpolation
+     */
+    public function vDeleteComplex($sTable, $sWhereClause, $aBinds){
+        // Validate inputs
+        if(empty($sTable) || !is_string($sTable)) {
+            throw new \InvalidArgumentException("sTable must be a non-empty string");
+        }
+        if(empty($sWhereClause) || !is_string($sWhereClause)) {
+            throw new \InvalidArgumentException("sWhereClause must be a non-empty string");
+        }
+        if(!is_array($aBinds)) {
+            throw new \InvalidArgumentException("aBinds must be an array");
+        }
+
+        // Security warning: Check for suspicious patterns
+        $suspiciousPatterns = [
+            '/\bunion\b/i',           // UNION keyword
+            '/;\s*(drop|delete|insert|update|create|alter)\b/i',  // Stacked queries
+            "/'\s*(or|and)\s*'/i",    // Quote patterns like ' OR '
+            "/\b(or|and)\s+1\s*=\s*1/i",  // OR 1=1 pattern
+            "/['\"]\s*\)/i",  // Closing quote and paren
+        ];
+
+        foreach($suspiciousPatterns as $pattern) {
+            if(preg_match($pattern, $sWhereClause)) {
+                trigger_error(
+                    "vDeleteComplex: Suspicious SQL pattern detected in WHERE clause. " .
+                    "Ensure all dynamic values are passed through aBinds, not concatenated into sWhereClause. " .
+                    "Query: DELETE FROM {$sTable} WHERE {$sWhereClause}",
+                    E_USER_WARNING
+                );
+            }
+        }
+
+        $sSql = "DELETE FROM `" . $sTable . "` WHERE " . $sWhereClause;
+
+        try{
+            $this->iQuery($sSql, $aBinds);
+            if(!$this->m_iRs) {
+                throw new \Exception("CDbShell->vDeleteComplex: fail to delete data in $sTable");
+            }
+            $this->m_iRs->closeCursor();
+        } catch (\PDOException $e) {
+            throw new \PDOException($e->getMessage());
+        }
     }
 
     /**

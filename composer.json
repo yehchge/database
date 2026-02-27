@@ -20,5 +20,11 @@
         "psr-4": {
            "yehchge\\database\\": "src/"
        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+           "yehchge\\database\\": ["src/", "tests/"]
+        },
+        "classmap": ["tests/"]
     }
 }
