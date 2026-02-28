@@ -8,8 +8,8 @@ declare(strict_types=1);
 
 namespace yehchge\database;
 
-class Database {
-
+class Database
+{
     // Variables
     private $m_sHost = "";
     private $m_sUser = "";
@@ -21,7 +21,8 @@ class Database {
     private $m_character = "utf8";
     private $dsn     = '';
 
-    private $iTransactionLayer = 0; //used to control nested transaction(for nested classes' functions)
+    //used to control nested transaction(for nested classes' functions)
+    private $iTransactionLayer = 0;
 
     /**
      * 連線資料庫
@@ -31,20 +32,31 @@ class Database {
      * @param string $sPass MySQL Password
      * @param string $sPort MySQL Port
      */
-    public function __construct($sDb='',$sHost='',$sUser='',$sPass='',$sPort='') {
-        $this->m_sHost=defined('_MYSQL_HOST')?_MYSQL_HOST:null;
-        $this->m_sUser=defined('_MYSQL_USER')?_MYSQL_USER:null;
-        $this->m_sPass=defined('_MYSQL_PASS')?_MYSQL_PASS:null;
-        $this->m_sDb=defined('_MYSQL_DB')?_MYSQL_DB:null;
-        $this->m_sPort=defined('_MYSQL_PORT')?_MYSQL_DB:null;
+    public function __construct($sDb = '', $sHost = '', $sUser = '', $sPass = '', $sPort = '')
+    {
+        $this->m_sHost = defined('_MYSQL_HOST') ? _MYSQL_HOST : null;
+        $this->m_sUser = defined('_MYSQL_USER') ? _MYSQL_USER : null;
+        $this->m_sPass = defined('_MYSQL_PASS') ? _MYSQL_PASS : null;
+        $this->m_sDb = defined('_MYSQL_DB') ? _MYSQL_DB : null;
+        $this->m_sPort = defined('_MYSQL_PORT') ? _MYSQL_DB : null;
 
-        if($sDb) $this->m_sDb=$sDb;
-        if($sHost) $this->m_sHost=$sHost;
-        if($sUser) $this->m_sUser=$sUser;
-        if($sPass) $this->m_sPass=$sPass;
-        if($sPort) $this->m_sPort=$sPort;
+        if ($sDb) {
+            $this->m_sDb = $sDb;
+        }
+        if ($sHost) {
+            $this->m_sHost = $sHost;
+        }
+        if ($sUser) {
+            $this->m_sUser = $sUser;
+        }
+        if ($sPass) {
+            $this->m_sPass = $sPass;
+        }
+        if ($sPort) {
+            $this->m_sPort = $sPort;
+        }
 
-        if(!$this->m_iDbh) {
+        if (!$this->m_iDbh) {
             $this->vConnect();
         }
     }
@@ -53,19 +65,20 @@ class Database {
     {
         $this->m_iDbh = null;
 
-        if($this->iTransactionLayer !== 0){
+        if ($this->iTransactionLayer !== 0) {
             $sLogicErrorMsg = "vBegin & vCommit's quantity do not match on database: {$this->m_sDb}!";
             die($sLogicErrorMsg);
         }
     }
 
-    public static function oDB($sDBName){
-        $port = defined('_'.$sDBName.'_PORT') ? constant('_'.$sDBName.'_PORT') : '3306';
+    public static function oDB($sDBName)
+    {
+        $port = defined('_' . $sDBName . '_PORT') ? constant('_' . $sDBName . '_PORT') : '3306';
         $aDB[$sDBName] = new self(
-            constant('_'.$sDBName.'_DB'),
-            constant('_'.$sDBName.'_HOST'),
-            constant('_'.$sDBName.'_USER'),
-            constant('_'.$sDBName.'_PASS'),
+            constant('_' . $sDBName . '_DB'),
+            constant('_' . $sDBName . '_HOST'),
+            constant('_' . $sDBName . '_USER'),
+            constant('_' . $sDBName . '_PASS'),
             $port
         );
 
@@ -76,7 +89,8 @@ class Database {
      * 設定 MySQL 連結為 UTF-8
      * @created 2014/11/14
      */
-    public function bSetCharacter($encode = 'utf8') {
+    public function bSetCharacter($encode = 'utf8')
+    {
         // mysqli_set_charset($this->m_iDbh, $encode);
         $this->iQuery("SET character_set_client = '$encode'");
         $this->iQuery("SET character_set_results = '$encode'");
@@ -87,7 +101,8 @@ class Database {
      * 連線資料庫
      * @return void
      */
-    public function vConnect() {
+    public function vConnect()
+    {
         // 判斷是否為 SQLite 記憶體模式
         if ($this->m_sHost === ':memory:' || $this->m_sDb === ':memory:') {
             $this->dsn = "sqlite::memory:";
@@ -119,7 +134,8 @@ class Database {
      * 關閉資料庫
      * @return void
      */
-    public function vClose() {
+    public function vClose()
+    {
         $this->m_iDbh = null;
     }
 
@@ -129,7 +145,8 @@ class Database {
      * @param  array  $aBinds 綁定的資料
      * @return \PDOStatement returns value of variable $m_iRs
      */
-    public function iQuery($sSql, $aBinds=array()) {
+    public function iQuery($sSql, $aBinds = array())
+    {
         $i = 0;
 
         try {
@@ -140,8 +157,8 @@ class Database {
             }
 
             $this->m_iRs->execute();
-        } catch(\PDOException $e) {
-            throw new \PDOException("\nSQL Error: $sSql\n".$e->getMessage());
+        } catch (\PDOException $e) {
+            throw new \PDOException("\nSQL Error: $sSql\n" . $e->getMessage());
         }
 
         return $this->m_iRs;
@@ -152,10 +169,16 @@ class Database {
     * @param $iRs resource result
     * @return int Get number of rows in result
     */
-    public function iNumRows($iRs=0) {
-        if($iRs) $iTmpRs = $iRs;
-        else     $iTmpRs = $this->m_iRs;
-        if(!$iTmpRs) return 0;
+    public function iNumRows($iRs = 0)
+    {
+        if ($iRs) {
+            $iTmpRs = $iRs;
+        } else {
+            $iTmpRs = $this->m_iRs;
+        }
+        if (!$iTmpRs) {
+            return 0;
+        }
         // return $iTmpRs->rowCount(); // for MySQL
         $results = $iTmpRs->fetchAll(\PDO::FETCH_ASSOC);
         $count = count($results);
@@ -167,15 +190,22 @@ class Database {
     * @param $iRs resource result
     * @return array Fetch a result row as an associative array, a numeric array, or both.
     */
-    public function aFetchAssoc($iRs=0) {
-        if(!$this->m_iRs && !$iRs) return [];
+    public function aFetchAssoc($iRs = 0)
+    {
+        if (!$this->m_iRs && !$iRs) {
+            return [];
+        }
 
-        if($iRs) $iTmpRs = $iRs;
-        else     $iTmpRs = $this->m_iRs;
+        if ($iRs) {
+            $iTmpRs = $iRs;
+        } else {
+            $iTmpRs = $this->m_iRs;
+        }
         return   $iTmpRs->fetch(\PDO::FETCH_ASSOC);
     }
 
-    public function aFetchArray($iRs=0) {
+    public function aFetchArray($iRs = 0)
+    {
         return $this->aFetchAssoc($iRs);
     }
 
@@ -183,8 +213,11 @@ class Database {
     * 取得 insert 後的自動流水號
     * @return int Get the ID generated from the previous INSERT operation
     */
-    public function iGetInsertId() {
-        if(!$this->m_iRs) return 0;
+    public function iGetInsertId()
+    {
+        if (!$this->m_iRs) {
+            return 0;
+        }
         return $this->m_iDbh->lastInsertId();
     }
 
@@ -195,24 +228,27 @@ class Database {
      * @param array  $aBinds The add data array
      * @return int The ID generated from the previous INSERT operation
      */
-    public function bInsert($sTable, $aBinds) {
-        if(!is_array($aBinds)) return 0;
+    public function bInsert($sTable, $aBinds)
+    {
+        if (!is_array($aBinds)) {
+            return 0;
+        }
 
-        $sSql="INSERT INTO $sTable ";
+        $sSql = "INSERT INTO $sTable ";
         $aField = array_keys($aBinds);
-        $sSql.='('.implode(",",$aField).')';
-        $sSql.='VALUES(:'.implode(", :", $aField).')';
+        $sSql .= '(' . implode(",", $aField) . ')';
+        $sSql .= 'VALUES(:' . implode(", :", $aField) . ')';
         $this->m_iRs = $this->m_iDbh->prepare($sSql);
-        foreach($aBinds as $bindKey => $value){
+        foreach ($aBinds as $bindKey => $value) {
             $this->m_iRs->bindValue(":$bindKey", $value);
         }
 
-        try{
+        try {
             $this->m_iRs->execute();
             $insertId = $this->iGetInsertId();
             $this->m_iRs->closeCursor();
             return $insertId;
-        }catch(\PDOException $e){
+        } catch (\PDOException $e) {
             throw new \PDOException($e->getMessage());
         }
     }
@@ -226,29 +262,32 @@ class Database {
      * @param array  $aBinds 欄位 => 值
      * @return string 執行的 SQL；失敗回傳空字串
      */
-    public function sInsert($sTable, $aBinds) {
+    public function sInsert($sTable, $aBinds)
+    {
         // 可選：在執行時觸發使用警告，幫助開發期發現
         trigger_error(
             __METHOD__ . ' is deprecated, use ' . __CLASS__ . '::bInsert() instead',
             E_USER_DEPRECATED
         );
 
-        if(!is_array($aBinds)) return '';
+        if (!is_array($aBinds)) {
+            return '';
+        }
 
-        $sSql="INSERT INTO $sTable ";
-        $aField = array_keys($aBinds); 
-        $sSql.='('.implode(",",$aField).')';
-        $sSql.='VALUES(:'.implode(", :", $aField).')';
+        $sSql = "INSERT INTO $sTable ";
+        $aField = array_keys($aBinds);
+        $sSql .= '(' . implode(",", $aField) . ')';
+        $sSql .= 'VALUES(:' . implode(", :", $aField) . ')';
         $this->m_iRs = $this->m_iDbh->prepare($sSql);
-        foreach($aBinds as $bindKey => $value){
+        foreach ($aBinds as $bindKey => $value) {
             $this->m_iRs->bindValue(":$bindKey", $value);
         }
 
-        try{
+        try {
             $this->m_iRs->execute();
             $this->m_iRs->closeCursor();
             return $sSql;
-        }catch(\PDOException $ex){
+        } catch (\PDOException $ex) {
             throw new \Exception($ex->getMessage());
         }
     }
@@ -261,40 +300,43 @@ class Database {
      * @param array  $aBinds The update data array
      * @return int The number of affected rows
      */
-    public function bUpdate($sTable, $aWhere, $aBinds) {
-        if(!is_array($aBinds)) return 0;
-        
+    public function bUpdate($sTable, $aWhere, $aBinds)
+    {
+        if (!is_array($aBinds)) {
+            return 0;
+        }
+
         $aField = array_keys($aBinds);
         $aWhereField = $aWhere ? array_keys($aWhere) : [];
-        
+
         // Build SET clause with named parameters
         $setClause = [];
-        foreach($aField as $field) {
+        foreach ($aField as $field) {
             $setClause[] = "`" . $field . "` = :" . $field;
         }
-        
+
         $sSql = "UPDATE `" . $sTable . "` SET " . implode(", ", $setClause);
-        
+
         // Build WHERE clause with named parameters (safe from SQL injection)
-        if($aWhere && is_array($aWhere) && count($aWhere) > 0) {
+        if ($aWhere && is_array($aWhere) && count($aWhere) > 0) {
             $whereClause = [];
-            foreach($aWhereField as $key) {
+            foreach ($aWhereField as $key) {
                 $whereClause[] = "`" . $key . "` = :where_" . $key;
             }
             $sSql .= " WHERE " . implode(" AND ", $whereClause);
         }
 
-        try{
+        try {
             $this->m_iRs = $this->m_iDbh->prepare($sSql);
-            
+
             // Bind SET values
-            foreach($aBinds as $bindKey => $value){
+            foreach ($aBinds as $bindKey => $value) {
                 $this->m_iRs->bindValue(":" . $bindKey, $value, is_int($value) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
             }
-            
+
             // Bind WHERE values with distinct parameter names to avoid conflicts
-            if($aWhere && is_array($aWhere)) {
-                foreach($aWhere as $key => $value) {
+            if ($aWhere && is_array($aWhere)) {
+                foreach ($aWhere as $key => $value) {
                     $this->m_iRs->bindValue(":where_" . $key, $value, is_int($value) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
                 }
             }
@@ -304,7 +346,7 @@ class Database {
             $this->m_iRs->closeCursor();
 
             return $iAffectedRows;
-        }catch(\PDOException $ex){
+        } catch (\PDOException $ex) {
             throw new \PDOException($ex->getMessage());
         }
     }
@@ -319,36 +361,42 @@ class Database {
      * @param string $sWhere The where condition
      * @return string The SQL string if successful, empty string on failure
      */
-    public function sUpdate($sTable,$aBinds,$sWhere) {
+    public function sUpdate($sTable, $aBinds, $sWhere)
+    {
         // 可選：在執行時觸發使用警告，幫助開發期發現
         trigger_error(
             __METHOD__ . ' is deprecated, use ' . __CLASS__ . '::bUpdate() instead',
             E_USER_DEPRECATED
         );
 
-        if(!is_array($aBinds)) return '';
+        if (!is_array($aBinds)) {
+            return '';
+        }
         $aField = array_keys($aBinds);
 
-        $sSql="UPDATE $sTable SET ";
-        for($i=0;$i<count($aField);$i++) {
-            $sSql.="`".$aField[$i]."`=:".$aField[$i];
-            if(($i+1)!=count($aField)) $sSql.=",";
+        $sSql = "UPDATE $sTable SET ";
+        for ($i = 0; $i < count($aField); $i++) {
+            $sSql .= "`" . $aField[$i] . "`=:" . $aField[$i];
+            if (($i + 1) != count($aField)) {
+                $sSql .= ",";
+            }
         }
-        if($sWhere)
-            $sSql.=" WHERE ".$sWhere;
+        if ($sWhere) {
+            $sSql .= " WHERE " . $sWhere;
+        }
 
-        try{
+        try {
             $this->m_iRs = $this->m_iDbh->prepare($sSql);
 
-            foreach($aBinds as $bindKey => $value){
-                $this->m_iRs->bindValue(":$bindKey", $value, \PDO::PARAM_STR| \PDO::PARAM_INT);
+            foreach ($aBinds as $bindKey => $value) {
+                $this->m_iRs->bindValue(":$bindKey", $value, \PDO::PARAM_STR | \PDO::PARAM_INT);
             }
 
             $this->m_iRs->execute();
             // $iAffectedRows = $this->m_iRs->rowCount();
             $this->m_iRs->closeCursor();
             return $sSql;
-        }catch(\PDOException $ex){
+        } catch (\PDOException $ex) {
             throw new \PDOException($ex->getMessage());
         }
     }
@@ -356,10 +404,12 @@ class Database {
     /**
      * 刪除零寬字元
      * Replace non-breaking spaces with normal spaces
+     *
      * @param $str
      * @return string
      */
-    public static function removeNbsp($str){
+    public static function removeNbsp($str)
+    {
         if (is_string($str)) {
             $str = trim($str);
             $str = preg_replace('/[\x{00A0}\x{2002}\x{2003}\x{2004}\x{2005}\x{2006}\x{2007}\x{2008}\x{2009}\x{200A}\x{202F}\x{205F}\x{3000}]/isu', ' ', $str);
@@ -375,7 +425,7 @@ class Database {
      * @param string $sWhere The WHERE clause with placeholders (e.g., "id = ? AND status = ?")
      * @param array  $aBinds The values to bind (indexed array matching ? placeholders in order)
      * @return void
-     * 
+     *
      * SECURITY NOTICE:
      * This method is safe from SQL injection ONLY if:
      * 1. $sWhere contains ONLY the WHERE condition template with ? placeholders
@@ -388,25 +438,26 @@ class Database {
      * $db->vDelete('users', 'id = ? AND status = ?', [123, 'inactive']);
      * $db->vDelete('users', 'email LIKE ?', ['%@example.com']);
      * $db->vDelete('users', 'age > ? AND (status = ? OR role = ?)', [18, 'inactive', 'guest']);
-     * 
+     *
      * ❌ UNSAFE examples (DO NOT USE):
      * $db->vDelete('users', 'id = ' . $userId);  // ❌ Direct concatenation
      * $db->vDelete('users', "status = '{$status}'");  // ❌ String interpolation
      * $db->vDelete('users', "id IN (" . implode(',', $ids) . ")");  // ❌ Array concatenation
      * $db->vDelete('users', "email = '{$email}' OR id = 1");  // ❌ Always dangerous
      */
-    public function vDelete($sTable, $sWhere, $aBinds=array()){
+    public function vDelete($sTable, $sWhere, $aBinds = array())
+    {
         // Validate inputs
-        if(empty($sTable) || !is_string($sTable)) {
+        if (empty($sTable) || !is_string($sTable)) {
             throw new \InvalidArgumentException("sTable must be a non-empty string");
         }
-        if(empty($sWhere) || !is_string($sWhere)) {
+        if (empty($sWhere) || !is_string($sWhere)) {
             throw new \InvalidArgumentException("sWhere must be a non-empty string");
         }
-        if(!is_array($aBinds)) {
+        if (!is_array($aBinds)) {
             throw new \InvalidArgumentException("aBinds must be an array");
         }
-        
+
         // Security warning: Check for suspicious patterns that might indicate direct concatenation
         // This is NOT a complete protection, but helps catch common mistakes
         $suspiciousPatterns = [
@@ -416,9 +467,9 @@ class Database {
             "/\b(or|and)\s+1\s*=\s*1/i",  // OR 1=1 pattern
             "/['\"]\s*\)/i",  // Closing quote and paren (query termination attempt)
         ];
-        
-        foreach($suspiciousPatterns as $pattern) {
-            if(preg_match($pattern, $sWhere)) {
+
+        foreach ($suspiciousPatterns as $pattern) {
+            if (preg_match($pattern, $sWhere)) {
                 // Log warning but still allow execution (for backwards compatibility)
                 // In production, this could trigger an alert or block the query
                 trigger_error(
@@ -429,12 +480,12 @@ class Database {
                 );
             }
         }
-        
+
         $sSql = "DELETE FROM `" . $sTable . "` WHERE " . $sWhere;
-        
-        try{
+
+        try {
             $this->iQuery($sSql, $aBinds);
-            if(!$this->m_iRs) {
+            if (!$this->m_iRs) {
                 throw new \Exception("CDbShell->vDelete: fail to delete data in $sTable");
             }
             $this->m_iRs->closeCursor();
@@ -464,15 +515,16 @@ class Database {
      * $db->vDeleteComplex('users', 'id IN (' . implode(',', $ids) . ')', []);  // Array concatenation
      * $db->vDeleteComplex('users', "status = '{$status}'", []);  // String interpolation
      */
-    public function vDeleteComplex($sTable, $sWhereClause, $aBinds){
+    public function vDeleteComplex($sTable, $sWhereClause, $aBinds)
+    {
         // Validate inputs
-        if(empty($sTable) || !is_string($sTable)) {
+        if (empty($sTable) || !is_string($sTable)) {
             throw new \InvalidArgumentException("sTable must be a non-empty string");
         }
-        if(empty($sWhereClause) || !is_string($sWhereClause)) {
+        if (empty($sWhereClause) || !is_string($sWhereClause)) {
             throw new \InvalidArgumentException("sWhereClause must be a non-empty string");
         }
-        if(!is_array($aBinds)) {
+        if (!is_array($aBinds)) {
             throw new \InvalidArgumentException("aBinds must be an array");
         }
 
@@ -485,8 +537,8 @@ class Database {
             "/['\"]\s*\)/i",  // Closing quote and paren
         ];
 
-        foreach($suspiciousPatterns as $pattern) {
-            if(preg_match($pattern, $sWhereClause)) {
+        foreach ($suspiciousPatterns as $pattern) {
+            if (preg_match($pattern, $sWhereClause)) {
                 trigger_error(
                     "vDeleteComplex: Suspicious SQL pattern detected in WHERE clause. " .
                     "Ensure all dynamic values are passed through aBinds, not concatenated into sWhereClause. " .
@@ -498,9 +550,9 @@ class Database {
 
         $sSql = "DELETE FROM `" . $sTable . "` WHERE " . $sWhereClause;
 
-        try{
+        try {
             $this->iQuery($sSql, $aBinds);
-            if(!$this->m_iRs) {
+            if (!$this->m_iRs) {
                 throw new \Exception("CDbShell->vDeleteComplex: fail to delete data in $sTable");
             }
             $this->m_iRs->closeCursor();
@@ -510,23 +562,27 @@ class Database {
     }
 
     /**
-    * 得到table create sql info
-    * @param $sTable db table
-    * @return array
-    */
-    public function aGetCreateTableInfo($sTable){
+     * 得到 table create sql info
+     *
+     * @param string $sTable The table name
+     * @return array The create table info
+     */
+    public function aGetCreateTableInfo($sTable)
+    {
         $this->iQuery("SET SQL_QUOTE_SHOW_CREATE = 1");
         $this->iQuery("SHOW CREATE TABLE $sTable");
-        $aRow=$this->aFetchArray();
+        $aRow = $this->aFetchArray();
         return $aRow;
     }
 
     /**
-    * 得到table create sql info
-    * @param $sTable db table
-    * @return boolean
-    */
-    public function bIsTableExist($sTable){
+     * 檢查資料表是否存在
+     *
+     * @param string $sTable The table name
+     * @return boolean
+     */
+    public function bIsTableExist($sTable)
+    {
         if (strpos($this->dsn, 'sqlite:') === 0) {
             $sql = "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%$sTable%'";
         } else {
@@ -534,57 +590,77 @@ class Database {
         }
 
         $iDbq = $this->iQuery($sql);
-        if($this->iNumRows($iDbq))
+        if ($this->iNumRows($iDbq)) {
             return true;
+        }
         return false;
     }
 
     // transactions function
-    public function vBegin() {
+    public function vBegin()
+    {
         //if this CDbShell already start a trancation, it won't "begin" again , but only +1 on layer
-        if($this->iTransactionLayer===0)
+        if ($this->iTransactionLayer === 0) {
             $this->iQuery("begin");
+        }
         $this->iTransactionLayer++;
     }
 
-    public function vCommit() {
+    public function vCommit()
+    {
         //if this CDbShell's trancation layer is more than 1, it won't "commit" right away
         //, but only -1 on layer, there will be another vCommit later
         $this->iTransactionLayer--;
-        if($this->iTransactionLayer===0)
+        if ($this->iTransactionLayer === 0) {
             $this->iQuery("commit");
+        }
     }
 
-    public function vRollback() {
+    public function vRollback()
+    {
         $this->iTransactionLayer = 0;
         $this->iQuery("rollback");
     }
 
     /**
-    * 得到某筆資料是在第幾頁
-    * @param $sTable db table $iGoId 流水號 $iPageItems 每頁顯示比數 $sSearchSql 條件 $sPostFix 順序&limit
-    * @return int 數字
-    */
-    public function iGetItemAtPage($sTable="", $sField="", $iGoId=0, $iPageItems=0, $sSearchSql='', $aBinds=array(), $sPostFix=''){
-        if(!$sTable || !$sField) return 0;
+     * 得到某筆資料是在第幾頁
+     *
+     * @param string $sTable The table name
+     * @param string $sField The field name
+     * @param integer $iGoId 流水號
+     * @param integer $iPageItems 每頁顯示筆數
+     * @param string $sSearchSql 條件
+     * @param array $aBinds The binds array
+     * @param string $sPostFix 順序&limit
+     * @return integer The page number
+     */
+    public function iGetItemAtPage($sTable = "", $sField = "", $iGoId = 0, $iPageItems = 0, $sSearchSql = '', $aBinds = array(), $sPostFix = '')
+    {
+        if (!$sTable || !$sField) {
+            return 0;
+        }
         $sSql = "SELECT $sField FROM $sTable";
-        if($sSearchSql!=='')
+        if ($sSearchSql !== '') {
             $sSql .= " WHERE $sSearchSql";
-        if($sPostFix!=='')
+        }
+        if ($sPostFix !== '') {
             $sSql .= " $sPostFix";
+        }
 
-        $this->iQuery($sSql,$aBinds);
-        $i=0;
+        $this->iQuery($sSql, $aBinds);
+        $i = 0;
         $biFind = false;
-        while($aRow=$this->aFetchArray()) {
-            if($aRow[$sField]==$iGoId) {
+        while ($aRow = $this->aFetchArray()) {
+            if ($aRow[$sField] == $iGoId) {
                 $biFind = true;
                 break;
             }
             $i++;
         }
-        if(!$biFind) $i=0;
+        if (!$biFind) {
+            $i = 0;
+        }
 
-        return (INT)($i/$iPageItems);
+        return (int)($i / $iPageItems);
     }
 }

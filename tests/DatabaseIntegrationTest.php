@@ -1,18 +1,20 @@
 <?php
 
-require __DIR__.'/../src/Database.php';
+require __DIR__ . '/../src/Database.php';
 
 use PHPUnit\Framework\TestCase;
 use yehchge\database\Database;
 use PHPUnit\Framework\Attributes\DataProvider;
 
-class DatabaseIntegrationTest extends TestCase {
+class DatabaseIntegrationTest extends TestCase
+{
     // private $db;
 
     /**
      * 每次測試前執行的初始化
      */
-    public static function databaseProvider(): array {
+    public static function databaseProvider(): array
+    {
         // 使用 SQLite
         $sqlite = new Database(':memory:', ':memory:');
         $sqlite->iQuery("CREATE TABLE test_table (
@@ -40,7 +42,8 @@ class DatabaseIntegrationTest extends TestCase {
      * @dataProvider databaseProvider
      */
     #[DataProvider('databaseProvider')]
-    public function testCompleteCRUD(Database $db, string $envType) {
+    public function testCompleteCRUD(Database $db, string $envType)
+    {
         // 1. Insert
         $insertData = ['name' => 'TestUser', 'status' => 1];
         $id = $db->bInsert('test_table', $insertData);
@@ -78,10 +81,10 @@ class DatabaseIntegrationTest extends TestCase {
         // 6. create table
         if ($envType == 'mysql') {
             $aTableInfo = $db->aGetCreateTableInfo('test_table');
-            if(!empty($aTableInfo['Create Table'])){
+            if (!empty($aTableInfo['Create Table'])) {
                 $aTableInfo['Create Table'] = preg_replace("/test_table/i", "test_table_2025", $aTableInfo['Create Table']);
             }
-            $db->iQuery($aTableInfo['Create Table'].";\n\n");
+            $db->iQuery($aTableInfo['Create Table'] . ";\n\n");
             $insertData = ['name' => 'TestUser', 'status' => 1];
             $id = $db->bInsert('test_table_2025', $insertData);
             $this->assertGreaterThan(0, $id);
@@ -93,7 +96,7 @@ class DatabaseIntegrationTest extends TestCase {
 
         // Capture E_USER_DEPRECATED manually (older PHPUnit versions may lack expectDeprecation)
         $deprecationCaught = false;
-        set_error_handler(function($errno, $errstr) use (&$deprecationCaught) {
+        set_error_handler(function ($errno, $errstr) use (&$deprecationCaught) {
             if ($errno === E_USER_DEPRECATED && strpos($errstr, 'is deprecated') !== false) {
                 $deprecationCaught = true;
                 return true; // prevent PHP internal handler from running
@@ -115,7 +118,7 @@ class DatabaseIntegrationTest extends TestCase {
 
         // Capture E_USER_DEPRECATED manually (older PHPUnit versions may lack expectDeprecation)
         $deprecationCaught = false;
-        set_error_handler(function($errno, $errstr) use (&$deprecationCaught) {
+        set_error_handler(function ($errno, $errstr) use (&$deprecationCaught) {
             if ($errno === E_USER_DEPRECATED && strpos($errstr, 'is deprecated') !== false) {
                 $deprecationCaught = true;
                 return true; // prevent PHP internal handler from running
@@ -166,7 +169,7 @@ class DatabaseIntegrationTest extends TestCase {
         $this->assertEquals(1, $db->iGetItemAtPage('test_table', 'id', 1, 2, '', [], 'ORDER BY id DESC'));
     }
 
-    
+
     // public function testInsert() {
     //     $data = [
     //         'name' => 'Test User',
@@ -228,6 +231,4 @@ class DatabaseIntegrationTest extends TestCase {
     //     // 故意寫錯語法
     //     $this->db->iQuery("SELECT * FROM non_exists_table");
     // }
-
-
 }

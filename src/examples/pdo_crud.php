@@ -1,4 +1,5 @@
 <?php
+
 // 簡單 PDO CRUD 範例（示範用途，實務請用 migration 與更完整錯誤處理）
 
 declare(strict_types=1);
