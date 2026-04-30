@@ -229,5 +229,59 @@ class DatabaseIntegrationTest extends TestCase {
     //     $this->db->iQuery("SELECT * FROM non_exists_table");
     // }
 
+    /**
+     * 測試 iLargeQuery：回傳 PDOStatement 並可逐行 fetch
+     * @dataProvider databaseProvider
+     */
+    #[DataProvider('databaseProvider')]
+    public function testILargeQuery(Database $db, string $envType) {
+        // 先插入測試資料
+        $db->bInsert('test_table', ['name' => 'LargeRow1', 'status' => 1]);
+        $db->bInsert('test_table', ['name' => 'LargeRow2', 'status' => 2]);
+        $db->bInsert('test_table', ['name' => 'LargeRow3', 'status' => 3]);
+
+        // iLargeQuery 應回傳 PDOStatement
+        $stmt = $db->iLargeQuery("SELECT * FROM test_table");
+        $this->assertInstanceOf(\PDOStatement::class, $stmt);
+
+        // 可逐行 fetch，不需一次載入全部資料
+        $rows = [];
+        while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+            $rows[] = $row;
+        }
+        $this->assertGreaterThanOrEqual(3, count($rows));
+
+        // 確認欄位結構正確
+        $this->assertArrayHasKey('id', $rows[0]);
+        $this->assertArrayHasKey('name', $rows[0]);
+        $this->assertArrayHasKey('status', $rows[0]);
+    }
+
+    /**
+     * 測試 iLargeQuery：SQL 錯誤時應拋出 PDOException
+     * @dataProvider databaseProvider
+     */
+    #[DataProvider('databaseProvider')]
+    public function testILargeQueryThrowsOnError(Database $db, string $envType) {
+        $this->expectException(\PDOException::class);
+        $db->iLargeQuery("SELECT * FROM non_existent_table_xyz");
+    }
+
+    /**
+     * 測試 vClose：關閉連線後執行查詢應拋出例外
+     */
+    public function testVClose() {
+        // 建立獨立 SQLite 連線，避免影響其他測試
+        $db = new Database(':memory:', ':memory:');
+        $db->iQuery("CREATE TABLE close_test (id INTEGER PRIMARY KEY, val TEXT)");
+        $db->iQuery("SELECT 1"); // 確保 m_iRs 為有效 PDOStatement
+
+        // 關閉連線
+        $db->vClose();
+
+        // 關閉後呼叫 iQuery 應拋出例外（m_iDbh 已為 null）
+        $this->expectException(\Throwable::class);
+        $db->iQuery("SELECT 1");
+    }
 
 }

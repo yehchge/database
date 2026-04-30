@@ -120,6 +120,7 @@ class Database {
      * @return void
      */
     public function vClose() {
+        $this->m_iRs->closeCursor();
         $this->m_iDbh = null;
     }
 
@@ -144,6 +145,28 @@ class Database {
             throw new \PDOException("\nSQL Error: $sSql\n".$e->getMessage());
         }
 
+        return $this->m_iRs;
+    }
+
+    /**
+     * 使用於大量的資料讀取，避免一次把所有資料載入記憶體
+     * 使用 MYSQLI_USE_RESULT 的概念 → PDO 使用 PDO::MYSQL_ATTR_USE_BUFFERED_QUERY = false
+     * @param  string $sSql SQL 語句
+     * @return PDOStatement/false
+     */
+    public function iLargeQuery($sSql){
+        try{
+            // 重要：關閉緩衝查詢（unbuffered query），類似 mysqli 的 MYSQLI_USE_RESULT
+            $this->m_iRs = $this->m_iDbh->prepare($sSql, [
+                \PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => false
+            ]);
+            
+            $this->m_iRs->execute();
+
+            return $this->m_iRs;
+        }catch(\Exception $e){
+            throw new \PDOException("\nPDO SQL Error: $sSql\n".$e->getMessage());
+        }
         return $this->m_iRs;
     }
 
