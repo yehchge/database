@@ -21,9 +21,6 @@ class Database
     private $m_character = "utf8";
     private $dsn     = '';
 
-    //used to control nested transaction(for nested classes' functions)
-    private $iTransactionLayer = 0;
-
     /**
      * 連線資料庫
      * @param string $sDb   Database name
@@ -64,11 +61,6 @@ class Database
     public function __destruct()
     {
         $this->m_iDbh = null;
-
-        if ($this->iTransactionLayer !== 0) {
-            $sLogicErrorMsg = "vBegin & vCommit's quantity do not match on database: {$this->m_sDb}!";
-            die($sLogicErrorMsg);
-        }
     }
 
     public static function oDB($sDBName)
@@ -622,26 +614,16 @@ class Database
     // transactions function
     public function vBegin()
     {
-        //if this CDbShell already start a trancation, it won't "begin" again , but only +1 on layer
-        if ($this->iTransactionLayer === 0) {
-            $this->iQuery("begin");
-        }
-        $this->iTransactionLayer++;
+        $this->iQuery("begin");
     }
 
     public function vCommit()
     {
-        //if this CDbShell's trancation layer is more than 1, it won't "commit" right away
-        //, but only -1 on layer, there will be another vCommit later
-        $this->iTransactionLayer--;
-        if ($this->iTransactionLayer === 0) {
-            $this->iQuery("commit");
-        }
+        $this->iQuery("commit");
     }
 
     public function vRollback()
     {
-        $this->iTransactionLayer = 0;
         $this->iQuery("rollback");
     }
 
