@@ -216,12 +216,35 @@ class Database
         } else {
             $iTmpRs = $this->m_iRs;
         }
-        return   $iTmpRs->fetch(\PDO::FETCH_ASSOC);
+        return $iTmpRs->fetch(\PDO::FETCH_ASSOC);
     }
 
     public function aFetchArray($iRs = 0)
     {
-        return $this->aFetchAssoc($iRs);
+        if (!$this->m_iRs && !$iRs) {
+            return [];
+        }
+
+        if ($iRs) {
+            $iTmpRs = $iRs;
+        } else {
+            $iTmpRs = $this->m_iRs;
+        }
+        return $iTmpRs->fetch(\PDO::FETCH_BOTH);
+    }
+
+    public function aFetchRow($iRs = 0)
+    {
+        if (!$this->m_iRs && !$iRs) {
+            return [];
+        }
+        if ($iRs) {
+            $iTmpRs = $iRs;
+        } else {
+            $iTmpRs = $this->m_iRs;
+        }
+
+        return $iTmpRs->fetch(\PDO::FETCH_NUM);
     }
 
     /**
