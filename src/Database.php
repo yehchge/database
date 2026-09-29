@@ -501,7 +501,7 @@ class Database
         try {
             $this->iQuery($sSql, $aBinds);
             if (!$this->m_iRs) {
-                throw new \Exception("CDbShell->vDelete: fail to delete data in $sTable");
+                throw new \Exception("Database->vDelete: fail to delete data in $sTable");
             }
             $this->m_iRs->closeCursor();
         } catch (\PDOException $e) {
@@ -568,7 +568,7 @@ class Database
         try {
             $this->iQuery($sSql, $aBinds);
             if (!$this->m_iRs) {
-                throw new \Exception("CDbShell->vDeleteComplex: fail to delete data in $sTable");
+                throw new \Exception("Database->vDeleteComplex: fail to delete data in $sTable");
             }
             $this->m_iRs->closeCursor();
         } catch (\PDOException $e) {
