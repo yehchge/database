@@ -119,6 +119,9 @@ class Database
                 $this->m_iDbh = new \PDO($this->dsn, $user, $pass, $options);
             }
         } catch (\PDOException $e) {
+            $message = "Error DSN: ".$this->dsn;
+            echo $message."<br>";
+            error_log($message);
             throw new \RuntimeException('Database connection failed: ' . $e->getMessage());
         }
     }
